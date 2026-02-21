@@ -11,6 +11,7 @@ members = [
     "crates/bizclaw-runtime",
     "crates/bizclaw-gateway",
     "crates/bizclaw-agent",
+    "crates/bizclaw-platform",
 ]
 
 [workspace.package]

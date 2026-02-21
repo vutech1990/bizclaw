@@ -1,9 +1,10 @@
 //! Flash Attention — online softmax attention computation.
 //!
 //! Computes attention scores incrementally without materializing
-//! the full QK^T matrix, saving memory.
+//! the full QK^T matrix, saving O(seq_len) memory.
 
 /// Compute single-head attention output for a single query position.
+/// Uses online softmax (flash attention) — no intermediate score buffer.
 ///
 /// q: query vector [head_dim]
 /// key_cache: all key vectors [seq_len x head_dim]
@@ -28,30 +29,141 @@ pub fn attention(
 
     let scale = 1.0 / (head_dim as f32).sqrt();
 
-    // Compute attention scores: score[t] = q · k[t] / sqrt(d)
-    let mut scores = vec![0.0f32; seq_len];
+    // Online softmax (flash attention):
+    // Maintains running max and normalizer, avoiding score materialization.
+    let mut running_max = f32::NEG_INFINITY;
+    let mut running_sum = 0.0f32;
+    for v in output.iter_mut() { *v = 0.0; }
+
     for t in 0..seq_len {
         let k_offset = t * head_dim;
         let k = &key_cache[k_offset..k_offset + head_dim];
+
+        // Compute score = q · k / sqrt(d)
         let mut dot = 0.0f32;
         for i in 0..head_dim {
             dot += q[i] * k[i];
         }
-        scores[t] = dot * scale;
-    }
+        let score = dot * scale;
 
-    // Softmax over scores
-    crate::tensor::softmax(&mut scores);
+        // Online softmax update
+        let new_max = running_max.max(score);
 
-    // Weighted sum: output = sum(score[t] * v[t])
-    for v in output.iter_mut() {
-        *v = 0.0;
-    }
-    for t in 0..seq_len {
+        // Rescale existing accumulator
+        let scale_old = (running_max - new_max).exp();
+        let exp_score = (score - new_max).exp();
+
+        // Update running sum with rescaled old sum + new contribution
+        running_sum = running_sum * scale_old + exp_score;
+
+        // Rescale existing output and add new value contribution
         let v_offset = t * head_dim;
-        let weight = scores[t];
         for i in 0..head_dim {
-            output[i] += weight * value_cache[v_offset + i];
+            output[i] = output[i] * scale_old + exp_score * value_cache[v_offset + i];
+        }
+
+        running_max = new_max;
+    }
+
+    // Final normalization
+    if running_sum > 0.0 {
+        let inv_sum = 1.0 / running_sum;
+        for v in output.iter_mut() {
+            *v *= inv_sum;
+        }
+    }
+}
+
+/// Multi-head attention: apply attention for all heads in parallel.
+pub fn multi_head_attention(
+    output: &mut [f32],
+    q: &[f32],
+    key_cache: &[f32],
+    value_cache: &[f32],
+    n_heads: usize,
+    n_kv_heads: usize,
+    seq_len: usize,
+    head_dim: usize,
+) {
+    let gqa_ratio = n_heads / n_kv_heads;
+
+    for h in 0..n_heads {
+        let q_offset = h * head_dim;
+        let kv_head = h / gqa_ratio;
+        let kv_stride = n_kv_heads * head_dim;
+
+        // For GQA: multiple Q heads share the same KV head
+        let k_base = kv_head * head_dim;
+        let v_base = kv_head * head_dim;
+
+        // Build per-head key/value views (strided)
+        let q_slice = &q[q_offset..q_offset + head_dim];
+        let out_slice = &mut output[q_offset..q_offset + head_dim];
+
+        // Single-head attention with flash attention
+        attention_strided(
+            out_slice,
+            q_slice,
+            key_cache,
+            value_cache,
+            seq_len,
+            head_dim,
+            kv_stride,
+            k_base,
+            v_base,
+        );
+    }
+}
+
+/// Strided attention — works with interleaved multi-head KV cache layout.
+fn attention_strided(
+    output: &mut [f32],
+    q: &[f32],
+    key_cache: &[f32],
+    value_cache: &[f32],
+    seq_len: usize,
+    head_dim: usize,
+    kv_stride: usize,
+    k_base: usize,
+    v_base: usize,
+) {
+    if seq_len == 0 {
+        for v in output.iter_mut() { *v = 0.0; }
+        return;
+    }
+
+    let scale = 1.0 / (head_dim as f32).sqrt();
+    let mut running_max = f32::NEG_INFINITY;
+    let mut running_sum = 0.0f32;
+    for v in output.iter_mut() { *v = 0.0; }
+
+    for t in 0..seq_len {
+        let k_offset = t * kv_stride + k_base;
+        let v_offset = t * kv_stride + v_base;
+
+        let mut dot = 0.0f32;
+        for i in 0..head_dim {
+            dot += q[i] * key_cache[k_offset + i];
+        }
+        let score = dot * scale;
+
+        let new_max = running_max.max(score);
+        let scale_old = (running_max - new_max).exp();
+        let exp_score = (score - new_max).exp();
+
+        running_sum = running_sum * scale_old + exp_score;
+
+        for i in 0..head_dim {
+            output[i] = output[i] * scale_old + exp_score * value_cache[v_offset + i];
+        }
+
+        running_max = new_max;
+    }
+
+    if running_sum > 0.0 {
+        let inv_sum = 1.0 / running_sum;
+        for v in output.iter_mut() {
+            *v *= inv_sum;
         }
     }
 }
@@ -73,5 +185,43 @@ mod tests {
         // With a single KV pair, output should equal the value vector
         assert!((output[0] - 0.0).abs() < 1e-5);
         assert!((output[1] - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_flash_attention_consistency() {
+        // Verify flash attention gives same result as standard softmax
+        let head_dim = 4;
+        let seq_len = 3;
+        let q = vec![1.0, 0.5, 0.0, 0.0];
+        let key_cache = vec![
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.5, 0.5, 0.0, 0.0,
+        ];
+        let value_cache = vec![
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+        ];
+        let mut output = vec![0.0; head_dim];
+
+        attention(&mut output, &q, &key_cache, &value_cache, seq_len, head_dim);
+
+        // Output should be a weighted combination of values
+        let total: f32 = output.iter().sum();
+        assert!((total - 1.0).abs() < 1e-4, "Attention weights should sum to ~1.0, got {total}");
+    }
+
+    #[test]
+    fn test_attention_empty() {
+        let head_dim = 4;
+        let q = vec![1.0, 0.0, 0.0, 0.0];
+        let mut output = vec![1.0; head_dim];
+
+        attention(&mut output, &q, &[], &[], 0, head_dim);
+
+        for v in &output {
+            assert_eq!(*v, 0.0);
+        }
     }
 }

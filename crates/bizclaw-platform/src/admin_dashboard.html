@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BizClaw — Admin Platform</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--card:#21262d}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column}
+.sidebar .logo{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.sidebar .logo h2{font-size:18px;color:var(--accent)}
+.sidebar .logo p{font-size:12px;color:var(--muted)}
+.sidebar a{display:flex;align-items:center;padding:10px 20px;color:var(--muted);text-decoration:none;font-size:14px;gap:8px;transition:all .15s}
+.sidebar a:hover,.sidebar a.active{background:var(--card);color:var(--text)}
+.sidebar .bottom{margin-top:auto;padding:10px 20px;border-top:1px solid var(--border)}
+.sidebar .bottom a{padding:5px 0;font-size:13px}
+.main{flex:1;padding:30px;overflow-y:auto}
+.main h1{font-size:24px;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:25px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px}
+.stat label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+.stat .val{font-size:28px;font-weight:700}
+.stat .val.green{color:var(--green)}.stat .val.red{color:var(--red)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.card h3{font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between}
+.card h3 a{color:var(--accent);font-size:12px;text-decoration:none}
+.tenant-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.tenant-row:last-child{border:none}
+.tenant-name{color:var(--accent);font-weight:500;cursor:pointer}
+.tenant-slug{color:var(--muted);font-size:12px}
+.badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge.running{background:#1a3a2a;color:var(--green)}.badge.stopped{background:#2a2a2a;color:var(--muted)}.badge.error{background:#3a1a1a;color:var(--red)}
+.event{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.event:last-child{border:none}
+.event .type{font-weight:500}.event .meta{color:var(--muted);font-size:11px}
+.event .time{color:var(--muted);font-size:11px;white-space:nowrap}
+.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-danger{background:var(--red);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.hidden{display:none!important}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:30px;min-width:400px}
+.modal h2{margin-bottom:15px}.modal label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;margin-top:10px}
+.modal input,.modal select{width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px}
+.modal .actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+@media(max-width:768px){.sidebar{width:60px}.sidebar a span,.sidebar .logo p{display:none}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo"><h2>BizClaw</h2><p>Admin Platform</p></div>
+  <a class="active" onclick="showPage('dashboard')" href="#"><span>📊</span> <span>Dashboard</span></a>
+  <a onclick="showPage('tenants')" href="#"><span>🏢</span> <span>Tenants</span></a>
+  <a onclick="showPage('users')" href="#"><span>👥</span> <span>Users</span></a>
+  <a onclick="showPage('audit')" href="#"><span>📋</span> <span>Audit Log</span></a>
+  <div class="bottom"><a href="#" onclick="logout()">⏏ Logout</a></div>
+</aside>
+<main class="main">
+  <!-- Dashboard -->
+  <div id="page-dashboard">
+    <h1>📊 Dashboard</h1>
+    <div class="stats" id="stats-row"></div>
+    <div class="grid">
+      <div class="card"><h3>⚡ Tenant Health <a href="#" onclick="showPage('tenants')">View all</a></h3><div id="health-list"></div></div>
+      <div class="card"><h3>📋 Recent Activity <a href="#" onclick="showPage('audit')">View all</a></h3><div id="activity-list"></div></div>
+    </div>
+  </div>
+  <!-- Tenants -->
+  <div id="page-tenants" class="hidden">
+    <h1>🏢 Tenants <button class="btn btn-primary" onclick="showCreateModal()" style="margin-left:auto">+ New Tenant</button></h1>
+    <div id="tenants-list"></div>
+  </div>
+  <!-- Users -->
+  <div id="page-users" class="hidden">
+    <h1>👥 Users</h1>
+    <div id="users-list"></div>
+  </div>
+  <!-- Audit -->
+  <div id="page-audit" class="hidden">
+    <h1>📋 Audit Log</h1>
+    <div id="audit-full"></div>
+  </div>
+</main>
+<div id="modal-create" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Create Tenant</h2>
+    <label>Name</label><input id="f-name" placeholder="My Bot">
+    <label>Slug (subdomain)</label><input id="f-slug" placeholder="mybot">
+    <label>Provider</label>
+    <select id="f-provider"><option>openai</option><option>anthropic</option><option>ollama</option><option>gemini</option><option>deepseek</option><option>groq</option><option>brain</option></select>
+    <label>Model</label><input id="f-model" value="gpt-4o-mini">
+    <label>Plan</label>
+    <select id="f-plan"><option>free</option><option>pro</option><option>business</option></select>
+    <div class="actions">
+      <button class="btn btn-outline" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createTenant()">Create</button>
+    </div>
+  </div>
+</div>
+<script>
+const API='/api/admin';
+let currentPage='dashboard';
+function showPage(p){document.querySelectorAll('.main>div').forEach(d=>d.classList.add('hidden'));document.getElementById('page-'+p).classList.remove('hidden');document.querySelectorAll('.sidebar a').forEach(a=>a.classList.remove('active'));event.target.closest('a').classList.add('active');currentPage=p;loadPage()}
+function loadPage(){if(currentPage==='dashboard')loadDashboard();else if(currentPage==='tenants')loadTenants();else if(currentPage==='users')loadUsers();else if(currentPage==='audit')loadAudit()}
+async function loadDashboard(){
+  const s=await(await fetch(API+'/stats')).json();
+  document.getElementById('stats-row').innerHTML=
+    `<div class="stat"><label>Total Tenants</label><div class="val">${s.total_tenants}</div></div>`+
+    `<div class="stat"><label>▶ Running</label><div class="val green">${s.running}</div></div>`+
+    `<div class="stat"><label>⏹ Stopped</label><div class="val">${s.stopped}</div></div>`+
+    `<div class="stat"><label>⚠ Error</label><div class="val red">${s.error}</div></div>`+
+    `<div class="stat"><label>👥 Users</label><div class="val">${s.users}</div></div>`;
+  const t=await(await fetch(API+'/tenants')).json();
+  document.getElementById('health-list').innerHTML=t.tenants.slice(0,5).map(t=>
+    `<div class="tenant-row"><div><span class="tenant-name">${t.name}</span><div class="tenant-slug">${t.slug}</div></div><span class="badge ${t.status}">${t.status}</span></div>`).join('');
+  const a=await(await fetch(API+'/activity')).json();
+  document.getElementById('activity-list').innerHTML=(a.events||[]).slice(0,8).map(e=>
+    `<div class="event"><div><div class="type">${e.event_type}</div><div class="meta">${e.actor_type} (${e.actor_id.slice(0,8)}…)</div></div><div class="time">${e.created_at}</div></div>`).join('')
+}
+async function loadTenants(){
+  const d=await(await fetch(API+'/tenants')).json();
+  document.getElementById('tenants-list').innerHTML=d.tenants.map(t=>
+    `<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${t.name}</strong> <span class="badge ${t.status}">${t.status}</span><div class="tenant-slug">${t.slug} · ${t.provider}/${t.model} · :${t.port} · ${t.plan}</div></div><div style="display:flex;gap:8px">`+
+    (t.status!=='running'?`<button class="btn btn-primary" onclick="tenantAction('${t.id}','start')">▶ Start</button>`:`<button class="btn btn-outline" onclick="tenantAction('${t.id}','stop')">⏹ Stop</button>`)+
+    `<button class="btn btn-outline" onclick="tenantAction('${t.id}','restart')">🔄</button><button class="btn btn-danger" onclick="tenantAction('${t.id}','delete')">✕</button></div></div>${t.pairing_code?`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Pairing: <strong style="color:var(--yellow);font-size:16px">${t.pairing_code}</strong></div>`:''}</div>`).join('')
+}
+async function loadUsers(){const d=await(await fetch(API+'/users')).json();document.getElementById('users-list').innerHTML=(d.users||[]).map(u=>`<div class="card" style="margin-bottom:8px"><strong>${u.email}</strong> · ${u.role} · ${u.created_at}</div>`).join('')||'<p style="color:var(--muted)">No users yet</p>'}
+async function loadAudit(){const d=await(await fetch(API+'/activity')).json();document.getElementById('audit-full').innerHTML=(d.events||[]).map(e=>`<div class="event"><div><div class="type">${e.event_type}</div><div class="meta">${e.actor_type} · ${e.actor_id}</div></div><div class="time">${e.created_at}</div></div>`).join('')}
+function showCreateModal(){document.getElementById('modal-create').classList.remove('hidden')}
+function hideModal(){document.getElementById('modal-create').classList.add('hidden')}
+async function createTenant(){
+  const r=await fetch(API+'/tenants',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:document.getElementById('f-name').value,slug:document.getElementById('f-slug').value,provider:document.getElementById('f-provider').value,model:document.getElementById('f-model').value,plan:document.getElementById('f-plan').value})});
+  hideModal();loadPage()
+}
+async function tenantAction(id,action){
+  if(action==='delete'&&!confirm('Delete this tenant?'))return;
+  const method=action==='delete'?'DELETE':'POST';
+  const url=action==='delete'?`${API}/tenants/${id}`:`${API}/tenants/${id}/${action}`;
+  await fetch(url,{method});loadPage()
+}
+function logout(){location.reload()}
+loadDashboard();
+</script>
+</body>
+</html>
