@@ -6,8 +6,8 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 
 [![Rust](https://img.shields.io/badge/Rust-100%25-orange?logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-45%20passing-brightgreen)]()
-[![LoC](https://img.shields.io/badge/lines-8.7k%20Rust-informational)]()
+[![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen)]()
+[![LoC](https://img.shields.io/badge/lines-11.2k%20Rust-informational)]()
 [![Coverage](https://img.shields.io/badge/crates-11%2F11%20tested-success)]()
 
 ---
@@ -16,16 +16,17 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 
 ### 🎯 Tính năng chính
 
-- **🧠 Brain Engine** — Chạy model LLaMA ngay trên máy qua GGUF, mmap, quantization, KV Cache, Forward Pass, SIMD
-- **🔌 Đa nhà cung cấp AI** — OpenAI, Anthropic Claude, Ollama, llama.cpp, OpenRouter
+- **🧠 Brain Engine** — LLaMA inference: GGUF, mmap, quantization, **Flash Attention**, **FP16 KV Cache** (50% memory↓), **KV Cache Persistence**, **Grammar-Constrained JSON**, **Pre-computed RoPE**
+- **🔌 8 Providers** — OpenAI, Anthropic, Ollama, llama.cpp, Brain, **Gemini**, **DeepSeek**, **Groq**, OpenRouter
 - **💬 Đa kênh** — CLI, Zalo (Personal + OA), Telegram (polling), Discord (Gateway WS), Webhook
-- **🌐 Web Dashboard** — Giao diện quản lý trên browser tại `localhost:3000` (embedded trong binary)
+- **🌐 Web Dashboard** — Giao diện quản lý tại `localhost:3000` (embedded SPA)
+- **🏢 Multi-Tenant Platform** — Admin dashboard, tenant management, JWT auth, pairing codes, audit log
 - **⚡ Init Wizard** — Cài đặt chỉ với 1 lệnh `bizclaw init`
-- **🛠️ Tool Calling** — Shell, file, registry động với arg validation
-- **🔒 Bảo mật** — Command allowlist, path restriction, sandbox, AES-256, HMAC-SHA256
+- **🛠️ Tool Calling** — Shell, File, **Web Search** (DuckDuckGo), registry động
+- **🔒 Bảo mật** — Command allowlist, JWT + bcrypt, AES-256, HMAC-SHA256
 - **💾 Bộ nhớ** — SQLite, vector search (cosine), chế độ NoOp
 - **⚡ SIMD** — ARM NEON, x86 SSE2/AVX2 auto-dispatch
-- **📦 Module hoá** — 11 crate, 45 tests, 100% implemented
+- **📦 Module hoá** — 12 crates, 66 tests, 100% implemented
 
 ### 🏗️ Kiến trúc
 
@@ -428,13 +429,15 @@ cargo test -p bizclaw-runtime
 | Metric | Value |
 |--------|-------|
 | **Language** | 100% Rust |
-| **Crates** | 11 (10 library + 1 binary) |
-| **Lines of Code** | ~9,500 |
-| **Tests** | 45 passing (11/11 crates) |
+| **Crates** | 12 (11 library + 1 binary) |
+| **Lines of Code** | ~11,200 |
+| **Tests** | 66 passing (12/12 crates) |
+| **Providers** | 8 (OpenAI, Anthropic, Ollama, llama.cpp, Brain, Gemini, DeepSeek, Groq) |
 | **Build** | 0 errors |
 | **Stubs** | 0 (100% implemented) |
 | **Web Dashboard** | Embedded SPA (dark theme) |
-| **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes, sha2 |
+| **Multi-Tenant** | Admin Platform, JWT Auth, Tenant Manager |
+| **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes, sha2, bcrypt, jsonwebtoken |
 
 ---
 
