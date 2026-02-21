@@ -16,15 +16,16 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 
 ### 🎯 Tính năng chính
 
-- **🧠 Brain Engine (Bộ não cục bộ)** — Chạy model LLaMA ngay trên máy qua GGUF, mmap, quantization (Q4_0/Q8_0), KV Cache, Forward Pass đầy đủ, SIMD acceleration
-- **🔌 Đa nhà cung cấp AI** — OpenAI, Anthropic Claude, Ollama, llama.cpp, OpenRouter, hoặc bất kỳ server tương thích OpenAI
-- **💬 Đa kênh giao tiếp** — CLI, Zalo (Personal + OA + WebSocket), Telegram Bot (polling), Discord Bot (Gateway WS), Webhook
-- **🛠️ Tool Calling** — Thực thi shell, thao tác file, registry động với arg validation
-- **🔒 Bảo mật** — Danh sách lệnh cho phép, giới hạn đường dẫn, sandbox, mã hoá AES-256, HMAC-SHA256 webhook
-- **💾 Bộ nhớ** — SQLite, tìm kiếm vector (cosine similarity), chế độ tắt bộ nhớ
-- **🌐 Gateway HTTP** — REST API + WebSocket streaming (token-by-token) dựa trên Axum
-- **⚡ SIMD** — ARM NEON (Pi/Apple Silicon), x86 SSE2/AVX2 auto-dispatch
-- **📦 Module hoá** — 11 crate độc lập, 45 tests, hoán đổi qua hệ thống trait
+- **🧠 Brain Engine** — Chạy model LLaMA ngay trên máy qua GGUF, mmap, quantization, KV Cache, Forward Pass, SIMD
+- **🔌 Đa nhà cung cấp AI** — OpenAI, Anthropic Claude, Ollama, llama.cpp, OpenRouter
+- **💬 Đa kênh** — CLI, Zalo (Personal + OA), Telegram (polling), Discord (Gateway WS), Webhook
+- **🌐 Web Dashboard** — Giao diện quản lý trên browser tại `localhost:3000` (embedded trong binary)
+- **⚡ Init Wizard** — Cài đặt chỉ với 1 lệnh `bizclaw init`
+- **🛠️ Tool Calling** — Shell, file, registry động với arg validation
+- **🔒 Bảo mật** — Command allowlist, path restriction, sandbox, AES-256, HMAC-SHA256
+- **💾 Bộ nhớ** — SQLite, vector search (cosine), chế độ NoOp
+- **⚡ SIMD** — ARM NEON, x86 SSE2/AVX2 auto-dispatch
+- **📦 Module hoá** — 11 crate, 45 tests, 100% implemented
 
 ### 🏗️ Kiến trúc
 
@@ -79,25 +80,21 @@ git clone https://github.com/nguyenduchoai/bizclaw.git
 cd bizclaw
 cargo build --release
 
-# Chạy với OpenAI
-export OPENAI_API_KEY="sk-..."
+# Cài đặt (wizard tương tác)
+./target/release/bizclaw init
+
+# Chat ngay
 ./target/release/bizclaw chat
 
-# Chạy với Ollama (model cục bộ)
-ollama serve &
-ollama pull llama3.2
-./target/release/bizclaw chat --provider ollama --model llama3.2
+# Mở Web Dashboard
+./target/release/bizclaw serve --open
 
-# Chạy với Anthropic Claude
-export ANTHROPIC_API_KEY="sk-ant-..."
-./target/release/bizclaw chat --provider anthropic
+# Chat với Ollama (model cục bộ)
+./target/release/bizclaw chat --provider ollama --model llama3.2
 
 # Tải model cho Brain Engine
 ./target/release/bizclaw brain download tinyllama-1.1b
 ./target/release/bizclaw brain test "Xin chào!"
-
-# Xem thông tin hệ thống
-./target/release/bizclaw info
 ```
 
 ### ⚙️ Cấu hình
@@ -198,10 +195,11 @@ allowed_commands = ["ls", "cat", "echo", "pwd", "find", "grep"]
 |--------|---------|
 | **Ngôn ngữ** | 100% Rust |
 | **Số crate** | 11 (10 library + 1 binary) |
-| **Dòng code** | ~8,735 |
+| **Dòng code** | ~9,500 |
 | **Test** | 45 passing (11/11 crates) |
 | **Build** | 0 errors |
 | **Stubs** | 0 (100% implemented) |
+| **Web Dashboard** | Embedded SPA (dark theme) |
 | **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes, sha2 |
 
 ---
@@ -210,13 +208,14 @@ allowed_commands = ["ls", "cat", "echo", "pwd", "find", "grep"]
 
 ### 🎯 Features
 
-- **🧠 Local Brain Engine** — Run LLaMA models locally via GGUF with mmap, quantization, full forward pass, KV Cache, SIMD acceleration
-- **🔌 Multi-Provider** — OpenAI, Anthropic Claude, Ollama, llama.cpp, OpenRouter, or any OpenAI-compatible server
-- **💬 Multi-Channel** — CLI, Zalo (Personal + OA), Telegram (long polling), Discord (Gateway WS), Webhook (HMAC)
+- **🧠 Local Brain Engine** — Run LLaMA models locally via GGUF with mmap, quantization, full forward pass, KV Cache, SIMD
+- **🔌 Multi-Provider** — OpenAI, Anthropic Claude, Ollama, llama.cpp, OpenRouter
+- **💬 Multi-Channel** — CLI, Zalo (Personal + OA), Telegram (polling), Discord (Gateway WS), Webhook (HMAC)
+- **🌐 Web Dashboard** — Built-in management UI at `localhost:3000` (embedded in binary)
+- **⚡ Init Wizard** — One-command setup: `bizclaw init`
 - **🛠️ Tool Calling** — Shell execution, file operations, dynamic registry with arg validation
-- **🔒 Security** — Command allowlists, path restrictions, sandbox, AES-256 secrets, HMAC-SHA256 webhook verification
-- **💾 Memory** — SQLite persistence, in-memory vector search (cosine similarity), no-op mode
-- **🌐 HTTP Gateway** — REST API + WebSocket streaming (chat_start → chunks → chat_done)
+- **🔒 Security** — Command allowlists, path restrictions, sandbox, AES-256, HMAC-SHA256
+- **💾 Memory** — SQLite, vector search (cosine similarity), no-op mode
 - **⚡ SIMD** — ARM NEON (Pi/Apple Silicon), x86 SSE2/AVX2 auto-dispatch
 - **📦 Modular** — 11 crates, 45 tests, 100% implemented, swap via traits
 
@@ -228,25 +227,21 @@ git clone https://github.com/nguyenduchoai/bizclaw.git
 cd bizclaw
 cargo build --release
 
-# Run with OpenAI
-export OPENAI_API_KEY="sk-..."
+# Interactive setup wizard
+./target/release/bizclaw init
+
+# Start chatting
 ./target/release/bizclaw chat
 
-# Run with Ollama (local model)
-ollama serve &
-ollama pull llama3.2
-./target/release/bizclaw chat --provider ollama --model llama3.2
+# Open web dashboard
+./target/release/bizclaw serve --open
 
-# Run with Anthropic Claude
-export ANTHROPIC_API_KEY="sk-ant-..."
-./target/release/bizclaw chat --provider anthropic
+# Chat with Ollama (local)
+./target/release/bizclaw chat --provider ollama --model llama3.2
 
 # Download model for Brain Engine
 ./target/release/bizclaw brain download tinyllama-1.1b
 ./target/release/bizclaw brain test "Hello!"
-
-# System info
-./target/release/bizclaw info
 ```
 
 ### ⚙️ Configuration
@@ -434,10 +429,11 @@ cargo test -p bizclaw-runtime
 |--------|-------|
 | **Language** | 100% Rust |
 | **Crates** | 11 (10 library + 1 binary) |
-| **Lines of Code** | ~8,735 |
+| **Lines of Code** | ~9,500 |
 | **Tests** | 45 passing (11/11 crates) |
 | **Build** | 0 errors |
 | **Stubs** | 0 (100% implemented) |
+| **Web Dashboard** | Embedded SPA (dark theme) |
 | **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes, sha2 |
 
 ---
